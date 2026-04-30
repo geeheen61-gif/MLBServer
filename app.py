@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from predictor import HRPredictor
 import os
@@ -124,8 +124,10 @@ def analyze_game():
 def health():
     return jsonify({"status": "healthy"}), 200
 
+@app.route('/')
+def index():
+    return render_template('index.html')
+
 if __name__ == '__main__':
-    # For production level, we usually use waitress or gunicorn
-    # But for local dev/testing, this is fine. 
-    # I'll include a waitress start script later.
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)

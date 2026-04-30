@@ -1,323 +1,175 @@
-from pybaseball import statcast_batter, playerid_lookup, statcast_pitcher
+import os
+import json
+import time
+import threading
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 from groq import Groq
-import threading
+from pybaseball import statcast_batter, playerid_lookup, statcast_pitcher
+
+class DiskCache:
+    def __init__(self, cache_dir="cache"):
+        self.cache_dir = cache_dir
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+        self.lock = threading.Lock()
+
+    def _get_path(self, key):
+        return os.path.join(self.cache_dir, f"{key}.json")
+
+    def get(self, key, expiry_hours=24):
+        path = self._get_path(key)
+        if os.path.exists(path):
+            try:
+                with open(path, 'r') as f:
+                    cached = json.load(f)
+                
+                # Check expiry
+                if (time.time() - cached['timestamp']) < (expiry_hours * 3600):
+                    return cached['data']
+            except:
+                pass
+        return None
+
+    def set(self, key, data):
+        with self.lock:
+            try:
+                path = self._get_path(key)
+                with open(path, 'w') as f:
+                    json.dump({'timestamp': time.time(), 'data': data}, f)
+            except:
+                pass
 
 class HRPredictor:
     def __init__(self, api_keys):
         self.api_keys = api_keys if isinstance(api_keys, list) else [api_keys]
         self.current_key_index = 0
         self.client = Groq(api_key=self.api_keys[self.current_key_index])
-        self.bankroll = 1000
-        self.simulations = 4000
+        self.disk_cache = DiskCache()
+        self.simulations = 2000 # Reduced for speed
         self.league_avg_hr9 = 1.1
-        self.max_prob_cap = 0.38
-        self._id_cache = {}
-        self._data_cache = {}
-        self._cache_lock = threading.Lock()
 
     def _rotate_key(self):
-        """Switch to the next available API key."""
-        with self._cache_lock:
-            self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
-            new_key = self.api_keys[self.current_key_index]
-            self.client = Groq(api_key=new_key)
-            print(f"🔄 Rotated to API key index {self.current_key_index}")
+        self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
+        self.client = Groq(api_key=self.api_keys[self.current_key_index])
 
     def _groq_summary(self, prompt):
-        """Call Groq LLM for AI-generated summaries with automatic key rotation."""
-        for attempt in range(len(self.api_keys)):
+        for _ in range(len(self.api_keys)):
             try:
                 response = self.client.chat.completions.create(
                     model="llama-3.1-8b-instant",
-                    messages=[
-                        {"role": "system", "content": "You are a professional MLB betting analyst."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.2,
-                    max_tokens=250
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.1,
+                    max_tokens=200
                 )
                 return response.choices[0].message.content
-            except Exception as e:
-                error_msg = str(e).lower()
-                if "rate_limit" in error_msg or "429" in error_msg:
-                    print(f"⚠️ Rate limit reached for key {self.current_key_index}. Rotating...")
-                    self._rotate_key()
-                else:
-                    return f"AI Analysis Error: {str(e)}"
-        
-        return "AI Analysis Error: All API keys reached rate limits."
+            except:
+                self._rotate_key()
+        return "AI analysis temporarily unavailable."
 
-    def _get_player_id(self, first_name, last_name):
-        cache_key = f"{first_name}_{last_name}".lower()
-        with self._cache_lock:
-            if cache_key in self._id_cache:
-                return self._id_cache[cache_key]
+    def _get_player_id(self, name):
+        cache_key = f"id_{name.replace(' ', '_').lower()}"
+        cached_id = self.disk_cache.get(cache_key, expiry_hours=720) # Cache IDs for 30 days
+        if cached_id: return cached_id
+
+        print(f"Finding ID for {name}...")
+        parts = name.split()
+        if len(parts) < 2: return None
         
-        # Use playerid_lookup - it can be slow
-        df = playerid_lookup(last_name, first_name)
-        if not df.empty:
-            pid = df.iloc[0]['key_mlbam']
-            with self._cache_lock:
-                self._id_cache[cache_key] = pid
-            return pid
+        try:
+            df = playerid_lookup(parts[-1], parts[0])
+            if not df.empty:
+                pid = int(df.iloc[0]['key_mlbam'])
+                self.disk_cache.set(cache_key, pid)
+                return pid
+        except: pass
         return None
 
-    def predict(self, player_name, sportsbook_odds, pitcher_hr9, park_factor, pitcher_name="Unknown Pitcher", stadium_name="Unknown Stadium", is_home=True):
-        """Full Calibrated Pipeline for Batter Prediction with Linked Analysis."""
+    def predict(self, player_name, odds, hr9, park, **kwargs):
         try:
-            base_result = self._get_base_batter_data(player_name, sportsbook_odds)
-            if "error" in base_result:
-                return base_result
+            pid = self._get_player_id(player_name)
+            if not pid: return {"error": "Player not found"}
+
+            # Try to get probability from cache
+            cache_key = f"prob_{pid}"
+            base_prob = self.disk_cache.get(cache_key, expiry_hours=12)
             
-            base_prob = base_result["probability"]
+            if base_prob is None:
+                print(f"Calculating base probability for {player_name}...")
+                today = datetime.now()
+                start = (today - timedelta(days=120)).strftime("%Y-%m-%d")
+                df = statcast_batter(start, today.strftime("%Y-%m-%d"), pid)
+                
+                if df.empty:
+                    base_prob = 0.12 # Fallback to league average profile
+                else:
+                    df = df.dropna(subset=['events'])
+                    hr_rate = len(df[df['events'] == 'home_run']) / max(len(df), 1)
+                    avg_pa = len(df) / max(df['game_date'].nunique(), 1)
+                    
+                    sims = np.random.binomial(np.random.poisson(avg_pa, self.simulations), hr_rate)
+                    base_prob = np.mean(sims >= 1)
+                
+                self.disk_cache.set(cache_key, float(base_prob))
 
-            # Dampened Pitcher Adjustment (Baseline 1.1)
-            pitcher_adj = 1 + ((float(pitcher_hr9) - self.league_avg_hr9) * 0.15)
-            home_adj = 1.05 if is_home else 0.95
-
-            final_prob = base_prob * pitcher_adj * float(park_factor) * home_adj
-            final_prob = min(max(final_prob, 0.05), self.max_prob_cap)
-
-            # Betting Math
-            implied_probability = 100 / (sportsbook_odds + 100)
-            edge = final_prob - implied_probability
-            payout = sportsbook_odds / 100
-            ev = (final_prob * payout) - (1 - final_prob)
+            # Adjustments
+            adj = (1 + (float(hr9) - 1.1) * 0.2) * float(park)
+            if kwargs.get('is_home'): adj *= 1.05
             
-            b = sportsbook_odds / 100
-            kelly = max((final_prob * (b + 1) - 1) / b, 0)
-            recommended_bet = self.bankroll * (kelly * 0.25)
+            final_prob = min(max(base_prob * adj, 0.05), 0.40)
+            implied = 100 / (float(odds) + 100)
+            edge = final_prob - implied
 
-            # Value statement for AI prompt
-            if edge > 0:
-                value_statement = "The model indicates potential value on the over."
-            else:
-                value_statement = "The model does not indicate value on the over at current pricing."
-
-            prompt = f"""
-Provide a high-stakes professional MLB betting analysis for this specific matchup:
-BATTER: {player_name}
-PITCHER: {pitcher_name} (HR/9: {pitcher_hr9})
-STADIUM: {stadium_name} (Factor: {park_factor})
-
-DATA METRICS:
-- HR Probability: {final_prob:.3f}
-- Market Odds: {sportsbook_odds} (Implied: {implied_probability:.3f})
-- Edge: {edge:.3f}
-- EV: {ev:.3f}
-
-{value_statement}
-
-REQUIRED ANALYSIS STRUCTURE:
-1. SITUATIONAL BREAKDOWN: Explain EXACTLY why this batter is good (or bad) in these specific conditions. Mention the matchup against {pitcher_name} and how {stadium_name}'s unique traits affect the batter's swing path or power output.
-2. PERFORMANCE DEEP DIVE: Analyze recent form, power trends, and "overall performance" indicators for both the batter and pitcher.
-3. COMPLETE MATCH ANALYSIS: How does this specific prop fit into the context of the entire game? Mention atmospheric conditions if relevant.
-4. OVERALL MATCH PREDICTION: A final, authoritative verdict on whether to bet the over, and a projection of the match's home run volatility.
-
-Rules:
-- Be extremely analytical. Use terms like "exit velocity," "launch angle," or "pitch mix" if relevant.
-- Clearly state the SITUATION in which the batter excels.
-- End with a final section titled: ### OVERALL MATCH PREDICTION ###
-"""
-            client_summary = self._groq_summary(prompt)
-
+            prompt = f"Analyze MLB Batter {player_name} vs HR/9 {hr9} at Park Factor {park}. Prob: {final_prob:.2f}, Odds: {odds}. Short breakdown and ### OVERALL MATCH PREDICTION ###"
+            
             return {
-                "player_name": player_name,
-                "probability": float(final_prob),
-                "implied_probability": float(implied_probability),
-                "edge": float(edge),
-                "expected_value": float(ev),
-                "recommended_bet": float(recommended_bet),
-                "freshness": base_result["freshness"],
-                "summary": client_summary,
-                "value_present": bool(ev > 0)
+                "metrics": {
+                    "probability": f"{final_prob:.1%}",
+                    "implied_odds": f"{implied:.1%}",
+                    "edge": f"{edge:+.1%}",
+                    "ev": f"{(final_prob * (float(odds)/100) - (1-final_prob)):.2f}"
+                },
+                "summary": self._groq_summary(prompt)
             }
         except Exception as e:
-            return {"error": f"Internal Error: {str(e)}"}
+            return {"error": str(e)}
 
-    def _get_base_batter_data(self, player_name, sportsbook_odds):
+    def predict_pitcher(self, name, **kwargs):
         try:
-            names = player_name.split()
-            if len(names) < 2:
-                return {"error": "Provide first and last name."}
-            
-            player_id = self._get_player_id(names[0], names[-1])
-            if not player_id:
-                return {"error": f"Batter '{player_name}' not found."}
-            
-            today = datetime.now()
-            cache_key = f"data_batter_{player_id}"
-            with self._cache_lock:
-                if cache_key in self._data_cache:
-                    ts, data = self._data_cache[cache_key]
-                    if (today - ts).seconds < 3600:
-                        return data
+            pid = self._get_player_id(name)
+            if not pid: return {"error": "Pitcher not found"}
 
-            # Optimization: Try 120 days first, then fallback to 365
-            start_120 = today - timedelta(days=120)
-            data_raw = statcast_batter(start_120.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d"), player_id)
+            cache_key = f"pitcher_{pid}"
+            data = self.disk_cache.get(cache_key, expiry_hours=12)
             
-            if data_raw.empty:
-                start_365 = today - timedelta(days=365)
-                data_raw = statcast_batter(start_365.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d"), player_id)
+            if not data:
+                today = datetime.now()
+                start = (today - timedelta(days=90)).strftime("%Y-%m-%d")
+                df = statcast_pitcher(start, today.strftime("%Y-%m-%d"), pid)
+                
+                if df.empty: data = {"hr9": 1.2, "score": 50}
+                else:
+                    hrs = len(df[df['events'] == 'home_run'])
+                    outs = len(df[df['events'].isin(['field_out','strikeout','double_play'])])
+                    hr9 = (hrs / max(outs/3.0, 1)) * 9
+                    data = {"hr9": round(hr9, 2), "score": round(min(hr9 * 40, 100), 1)}
+                
+                self.disk_cache.set(cache_key, data)
 
-            if data_raw.empty:
-                return {"error": f"No Statcast data found for {player_name}."}
-            
-            data_clean = data_raw.dropna(subset=['launch_speed', 'launch_angle'])
-            bip_df = data_clean[data_clean['events'].notna()]
-            
-            if len(bip_df) < 20:
-                return {"error": f"Not enough data for {player_name} ({len(bip_df)} BIP found)."}
-            
-            hr_per_bip = len(bip_df[bip_df['events']=='home_run']) / len(bip_df)
-            avg_bip_game = len(bip_df) / data_raw['game_date'].nunique()
-
-            sims = []
-            for _ in range(self.simulations):
-                simulated_bip = np.random.poisson(avg_bip_game)
-                simulated_bip = max(simulated_bip, 1)
-                hrs = np.random.binomial(simulated_bip, hr_per_bip)
-                sims.append(1 if hrs >= 1 else 0)
-            
-            last_game = pd.to_datetime(data_raw['game_date']).max()
-            days_since = (today - last_game).days
-            freshness = "Fully Current" if days_since <= 3 else "Delayed" if days_since <= 10 else "Stale"
-
-            res = {
-                "player_name": player_name,
-                "probability": np.mean(sims),
-                "freshness": freshness
+            prompt = f"Analyze Pitcher {name} with HR/9 of {data['hr9']}. Short breakdown and ### OVERALL MATCH PREDICTION ###"
+            return {
+                "metrics": {"hr9": data['hr9'], "vulnerability_score": data['score']},
+                "summary": self._groq_summary(prompt)
             }
-            with self._cache_lock:
-                self._data_cache[cache_key] = (today, res)
-            return res
         except Exception as e:
-            return {"error": f"Statcast Processing Error: {str(e)}"}
+            return {"error": str(e)}
 
-    def predict_pitcher(self, pitcher_name, player_name="Unknown Batter", stadium_name="Unknown Stadium"):
-        """Calibrated Pitcher Model with Regression to Mean and Contextual Analysis."""
-        try:
-            print(f"DEBUG: Starting prediction for pitcher: {pitcher_name}")
-            names = pitcher_name.split()
-            p_id = self._get_player_id(names[0], names[-1])
-            if not p_id:
-                return {"error": f"Pitcher '{pitcher_name}' not found."}
-            
-            today = datetime.now()
-            cache_key = f"data_pitcher_{p_id}"
-            with self._cache_lock:
-                if cache_key in self._data_cache:
-                    ts, data = self._data_cache[cache_key]
-                    if (today - ts).seconds < 3600:
-                        return data
-
-            # Optimized Fetch (120 days)
-            start_120 = today - timedelta(days=120)
-            data_raw = statcast_pitcher(start_120.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d"), p_id)
-            
-            if data_raw.empty:
-                start_365 = today - timedelta(days=365)
-                data_raw = statcast_pitcher(start_365.strftime("%Y-%m-%d"), today.strftime("%Y-%m-%d"), p_id)
-            
-            if data_raw.empty:
-                return {"error": "No pitcher data found."}
-            
-            data_clean = data_raw.dropna(subset=["launch_speed", "launch_angle"])
-            bip_df = data_clean[data_clean["events"].notna()]
-            
-            if len(bip_df) < 20:
-                return {"error": f"Not enough recent data for {pitcher_name}."}
-            
-            hr_per_bip_allowed = len(bip_df[bip_df["events"]=="home_run"]) / len(bip_df)
-            hard_hit_allowed = len(bip_df[bip_df["launch_speed"]>=95]) / len(bip_df)
-            gb_rate = len(bip_df[bip_df["launch_angle"]<10]) / len(bip_df)
-            barrels = bip_df[(bip_df["launch_speed"]>=98) & (bip_df["launch_angle"].between(26, 30))]
-            barrel_rate_allowed = len(barrels) / len(bip_df)
-            
-            # Regression to mean for HR/9
-            total_hr = len(data_raw[data_raw['events']=='home_run'])
-            outs_list = ['field_out','strikeout','double_play','force_out','field_double_play']
-            total_outs = len(data_raw[data_raw['events'].isin(outs_list)])
-            innings = total_outs / 3.0 if total_outs > 0 else 1
-            hr9_raw = (total_hr / innings) * 9
-            hr9 = (0.6 * hr9_raw) + (0.4 * self.league_avg_hr9)
-            
-            v_score = min(max((hr_per_bip_allowed * 400) + (barrel_rate_allowed * 300) + (hr9 * 10) - (gb_rate * 20), 0), 100)
-            projected_k = round(np.random.normal(5.8, 1.3), 1)
-
-            prompt = f"""
-Provide a professional pitching vulnerability analysis for {pitcher_name}.
-MATCHUP CONTEXT:
-- Facing Batter: {player_name}
-- Playing at Stadium: {stadium_name}
-
-METRICS:
-- HR/BIP Allowed: {hr_per_bip_allowed:.3f}
-- Barrel Rate Allowed: {barrel_rate_allowed*100:.1f}%
-- Adj. HR/9: {hr9:.2f}
-- Ground Ball Rate: {gb_rate*100:.1f}%
-
-REQUIRED STRUCTURE:
-1. PITCHER SITUATIONAL ANALYSIS: Under what specific conditions does {pitcher_name} struggle? Analyze pitch mix vulnerabilities against a batter like {player_name} and how they perform in {stadium_name}'s specific environment.
-2. OVERALL PERFORMANCE: Evaluate current season trends, recent velocity changes, and consistency.
-3. COMPLETE MATCH ANALYSIS: How does this pitcher's profile impact the overall match scoring and home run potential for the opposing team today?
-4. OVERALL MATCH PREDICTION: Final verdict on this pitcher's likely performance floor/ceiling for today.
-
-End with a final section titled: ### OVERALL MATCH PREDICTION ###
-"""
-            pitcher_summary = self._groq_summary(prompt)
-
-            res = {
-                "pitcher_name": pitcher_name,
-                "HR_per_BIP_allowed": round(hr_per_bip_allowed, 3),
-                "HardHit_allowed_pct": round(hard_hit_allowed * 100, 1),
-                "GroundBall_rate": round(gb_rate, 3),
-                "Barrel_allowed": round(barrel_rate_allowed, 3),
-                "HR_per_9": round(hr9, 2),
-                "projected_k": projected_k,
-                "vulnerability_score": round(v_score, 1),
-                "confidence": "High" if len(bip_df) > 150 else "Medium",
-                "summary": pitcher_summary
-            }
-            
-            with self._cache_lock:
-                self._data_cache[cache_key] = (today, res)
-            return res
-        except Exception as e:
-            return {"error": f"Pitcher Error: {str(e)}"}
-
-    def ballpark_factor(self, stadium_name, player_name="Unknown Batter", pitcher_name="Unknown Pitcher"):
-        parks = {
-            "Coors Field": {"hr_factor": 1.25, "runs_factor": 1.34, "description": "High altitude, extreme hitter friendly."},
-            "Yankee Stadium": {"hr_factor": 1.18, "runs_factor": 1.05, "description": "Short porch in right field."},
-            "Fenway Park": {"hr_factor": 1.05, "runs_factor": 1.12, "description": "Green Monster impacts doubles/HRs."},
-            "Dodger Stadium": {"hr_factor": 1.10, "runs_factor": 0.95, "description": "Pitcher friendly at night, neutral day."},
-            "Oracle Park": {"hr_factor": 0.82, "runs_factor": 0.92, "description": "Extreme pitcher friendly, heavy air."},
+    def ballpark_factor(self, name, **kwargs):
+        parks = {"Coors Field": 1.25, "Yankee Stadium": 1.18, "Fenway Park": 1.05, "Dodger Stadium": 1.10}
+        factor = parks.get(name, 1.0)
+        prompt = f"Analyze {name} Ballpark. Factor: {factor}. Short breakdown and ### OVERALL MATCH PREDICTION ###"
+        return {
+            "metrics": {"park_factor": factor},
+            "summary": self._groq_summary(prompt)
         }
-        info = parks.get(stadium_name, {"hr_factor": 1.0, "runs_factor": 1.0, "description": "Neutral park factors."})
-        info["hr_factor"] = min(max(info["hr_factor"], 0.85), 1.25)
-
-        prompt = f"""
-Provide a deep analytical summary of {stadium_name} for a betting audience.
-MATCHUP CONTEXT:
-- Key Batter: {player_name}
-- Key Pitcher: {pitcher_name}
-
-HR Factor: {info['hr_factor']}
-Runs Factor: {info['runs_factor']}
-
-REQUIRED STRUCTURE:
-1. BALLPARK SITUATIONAL ANALYSIS: How do specific types of hitters like {player_name} benefit from this stadium? Mention dimensions, wind patterns, and how {pitcher_name}'s pitch style might interact with the air density here.
-2. OVERALL PERFORMANCE: How has this stadium performed recently in terms of total scoring and park-adjusted trends?
-3. COMPLETE MATCH ANALYSIS: How does this ballpark's profile change the overall strategy of the match between these specific teams/players?
-4. OVERALL MATCH PREDICTION: Final verdict on the "Over/Under" environment for today's match in this stadium.
-
-End with a final section titled: ### OVERALL MATCH PREDICTION ###
-"""
-        stadium_summary = self._groq_summary(prompt)
-        info["summary"] = stadium_summary
-        return info
