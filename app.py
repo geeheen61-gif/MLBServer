@@ -15,11 +15,17 @@ CORS(app,
      methods=["GET", "POST", "OPTIONS"],
      supports_credentials=False)
 
-# Initialize predictor with Groq API key from environment
-API_KEY = os.getenv("GROQ_API_KEY")
-if not API_KEY:
-    print("⚠️ WARNING: GROQ_API_KEY not found in environment.")
-predictor = HRPredictor(API_KEY)
+# Initialize predictor with Groq API keys from environment
+# Provide keys separated by commas, e.g. GROQ_API_KEY=key1,key2,key3
+API_KEYS_RAW = os.getenv("GROQ_API_KEY", "")
+API_KEYS = [k.strip() for k in API_KEYS_RAW.split(",") if k.strip()]
+
+if not API_KEYS:
+    print("⚠️ WARNING: No GROQ_API_KEY(s) found in environment.")
+    # Fallback for local testing if needed, but in production, this should fail early
+    API_KEYS = ["dummy_key"] 
+
+predictor = HRPredictor(API_KEYS)
 
 @app.route('/predict_batter', methods=['POST'])
 def predict_batter():

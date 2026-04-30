@@ -6,9 +6,10 @@ from groq import Groq
 import threading
 
 class HRPredictor:
-    def __init__(self, api_key):
-        self.api_key = api_key
-        self.client = Groq(api_key=self.api_key)
+    def __init__(self, api_keys):
+        self.api_keys = api_keys if isinstance(api_keys, list) else [api_keys]
+        self.current_key_index = 0
+        self.client = Groq(api_key=self.api_keys[self.current_key_index])
         self.bankroll = 1000
         self.simulations = 4000
         self.league_avg_hr9 = 1.1
@@ -17,21 +18,37 @@ class HRPredictor:
         self._data_cache = {}
         self._cache_lock = threading.Lock()
 
+    def _rotate_key(self):
+        """Switch to the next available API key."""
+        with self._cache_lock:
+            self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
+            new_key = self.api_keys[self.current_key_index]
+            self.client = Groq(api_key=new_key)
+            print(f"🔄 Rotated to API key index {self.current_key_index}")
+
     def _groq_summary(self, prompt):
-        """Call Groq LLM for AI-generated summaries."""
-        try:
-            response = self.client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {"role": "system", "content": "You are a professional MLB betting analyst."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.2,
-                max_tokens=250
-            )
-            return response.choices[0].message.content.strip()
-        except Exception:
-            return "AI summary unavailable."
+        """Call Groq LLM for AI-generated summaries with automatic key rotation."""
+        for attempt in range(len(self.api_keys)):
+            try:
+                response = self.client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=[
+                        {"role": "system", "content": "You are a professional MLB betting analyst."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    temperature=0.2,
+                    max_tokens=250
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "rate_limit" in error_msg or "429" in error_msg:
+                    print(f"⚠️ Rate limit reached for key {self.current_key_index}. Rotating...")
+                    self._rotate_key()
+                else:
+                    return f"AI Analysis Error: {str(e)}"
+        
+        return "AI Analysis Error: All API keys reached rate limits."
 
     def _get_player_id(self, first_name, last_name):
         cache_key = f"{first_name}_{last_name}".lower()
