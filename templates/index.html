@@ -3,438 +3,305 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diamond Prop AI</title>
+    <title>Diamond Prop AI | Mobile & Desktop Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
         :root {
-            --bg: #0D1117;
-            --surface: #161B22;
-            --border: #30363D;
-            --text-main: #F0F6FC;
-            --text-dim: #8B949E;
-            --blue: #58A6FF;
-            --red: #F85149;
-            --orange: #D29922;
+            --bg: #05070A;
+            --sidebar: #0A0C12;
+            --card: #0F1219;
+            --input: #151921;
+            --border: rgba(255, 255, 255, 0.05);
+            --accent: #38BDF8;
+            --primary: #6366F1;
+            --success: #10B981;
+            --text: #F1F5F9;
+            --text-dim: #64748B;
         }
 
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Outfit', sans-serif; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
         
-        body {
-            background-color: var(--bg);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-        }
+        body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; overflow-x: hidden; }
 
-        .app-shell {
-            width: 100%;
-            max-width: 480px;
-            background: var(--bg);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            border-left: 1px solid var(--border);
+        /* Sidebar - Hidden on Mobile */
+        .sidebar {
+            width: 280px;
+            background: var(--sidebar);
             border-right: 1px solid var(--border);
-        }
-
-        header {
-            padding: 30px 20px 20px;
-            text-align: center;
-        }
-
-        header h1 {
-            font-size: 1.5rem;
-            font-weight: 900;
-            letter-spacing: 1px;
-            color: #fff;
-        }
-
-        header span {
-            font-size: 0.7rem;
-            font-weight: 700;
-            color: var(--text-dim);
-            letter-spacing: 2px;
-            display: block;
-            margin-top: 5px;
-        }
-
-        nav {
-            display: flex;
-            background: var(--surface);
-            margin: 10px 20px;
-            border-radius: 15px;
-            padding: 5px;
-            border: 1px solid var(--border);
-        }
-
-        .nav-tab {
-            flex: 1;
-            background: transparent;
-            border: none;
-            padding: 12px;
-            border-radius: 12px;
-            color: var(--text-dim);
-            font-weight: 700;
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: 0.2s;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 5px;
+            padding: 40px 24px;
+            height: 100vh;
+            position: sticky;
+            top: 0;
         }
 
-        .nav-tab.active {
-            background: var(--bg);
-            color: var(--text-main);
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        .logo { display: flex; align-items: center; gap: 14px; margin-bottom: 50px; padding-left: 10px; }
+        .logo i { font-size: 26px; color: var(--accent); }
+        .logo h1 { font-family: 'Outfit', sans-serif; font-size: 1.3rem; font-weight: 900; letter-spacing: 1px; color: #fff; }
+
+        .nav-list { display: flex; flex-direction: column; gap: 10px; }
+        .nav-btn {
+            display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 12px;
+            color: var(--text-dim); text-decoration: none; font-size: 0.9rem; font-weight: 600;
+            transition: 0.3s; cursor: pointer; border: none; background: transparent; text-align: left; width: 100%;
+        }
+        .nav-btn.active { color: #fff; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); }
+        .nav-btn i { font-size: 18px; opacity: 0.7; }
+
+        /* Mobile Tab Bar - Hidden on Desktop */
+        .mobile-nav {
+            display: none;
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: var(--sidebar); border-top: 1px solid var(--border);
+            z-index: 1000; padding: 10px 5px;
+            justify-content: space-around; backdrop-filter: blur(20px);
+        }
+        .m-nav-item {
+            display: flex; flex-direction: column; align-items: center; gap: 4px;
+            color: var(--text-dim); font-size: 0.65rem; font-weight: 700; text-decoration: none; border: none; background: transparent;
+        }
+        .m-nav-item.active { color: var(--primary); }
+        .m-nav-item i { font-size: 1.2rem; }
+
+        /* Workspace Area */
+        .workspace { flex: 1; display: flex; flex-direction: column; }
+
+        .top-nav {
+            height: 80px; padding: 0 40px; display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--border); background: rgba(5, 7, 10, 0.5); backdrop-filter: blur(20px);
+            position: sticky; top: 0; z-index: 100;
         }
 
-        .nav-tab i { font-size: 1rem; }
-
-        main { padding: 10px 20px 40px; flex: 1; }
-        .panel { display: none; }
-        .panel.active { display: block; }
-
-        .card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 25px;
-            margin-top: 10px;
+        .status-pill {
+            display: flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.08);
+            border: 1px solid rgba(16, 185, 129, 0.2); padding: 6px 14px; border-radius: 30px;
+            font-size: 0.75rem; font-weight: 700; color: var(--success);
         }
+        .status-dot { width: 6px; height: 6px; background: var(--success); border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
 
-        .field-group { margin-bottom: 20px; }
-        
-        .field { margin-bottom: 15px; }
-        .field label {
-            display: block;
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: var(--text-dim);
-            margin-bottom: 8px;
+        /* Content Grid */
+        .content { padding: 40px; max-width: 1400px; width: 100%; margin: 0 auto; }
+        .header-box { margin-bottom: 40px; }
+        .header-box h2 { font-size: 2.2rem; font-weight: 800; letter-spacing: -1px; margin-bottom: 10px; }
+        .header-box p { color: var(--text-dim); font-size: 1rem; }
+
+        .layout-grid { display: grid; grid-template-columns: 420px 1fr; gap: 40px; align-items: start; }
+
+        .control-card { background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 30px; }
+        .input-group { margin-bottom: 24px; }
+        .input-group label { display: block; font-size: 0.7rem; font-weight: 800; color: var(--text-dim); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .input-box { background: var(--input); border: 1px solid var(--border); border-radius: 14px; padding: 14px 18px; display: flex; align-items: center; gap: 14px; }
+        .input-box input { background: transparent; border: none; color: #fff; outline: none; width: 100%; font-size: 1rem; font-weight: 600; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: var(--input); border-radius: 14px; margin-bottom: 25px; }
+        .toggle-row span { font-size: 0.9rem; font-weight: 600; }
+
+        .btn-run {
+            width: 100%; height: 60px; background: linear-gradient(135deg, var(--primary), #4F46E5);
+            border: none; border-radius: 16px; color: #fff; font-weight: 800; font-size: 1rem; cursor: pointer; transition: 0.3s;
+            display: flex; align-items: center; justify-content: center; gap: 12px;
         }
-
-        .input-container {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 12px 15px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .input-container input {
-            background: transparent;
-            border: none;
-            color: white;
-            outline: none;
-            width: 100%;
-            font-size: 0.95rem;
-            font-weight: 500;
-        }
-
-        .switch-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 5px;
-        }
-
-        .switch-row span { font-size: 0.85rem; font-weight: 600; }
-
-        /* Toggle Switch */
-        .toggle { position: relative; width: 40px; height: 22px; }
-        .toggle input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #30363D; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background: var(--blue); }
-        input:checked + .slider:before { transform: translateX(18px); }
-
-        .predict-btn {
-            width: 100%;
-            height: 55px;
-            border: none;
-            border-radius: 15px;
-            color: white;
-            font-weight: 800;
-            font-size: 0.9rem;
-            letter-spacing: 1px;
-            cursor: pointer;
-            transition: 0.2s;
-            margin-top: 10px;
-        }
-
-        .predict-btn:active { transform: scale(0.98); }
+        .btn-run:hover { transform: translateY(-2px); filter: brightness(1.1); }
 
         /* Results Area */
-        .results-container { margin-top: 30px; animation: fadeIn 0.5s; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        .stat-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 20px;
+        .empty-state {
+            height: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            border: 2px dashed var(--border); border-radius: 24px; color: var(--text-dim); padding: 40px; text-align: center;
         }
+        .empty-state i { font-size: 40px; margin-bottom: 15px; opacity: 0.2; }
 
-        .stat-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 15px;
-            padding: 15px;
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 25px; }
+        .stat-item { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 20px; border-bottom: 4px solid var(--accent); }
+        .stat-label { font-size: 0.65rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; margin-bottom: 8px; display: block; }
+        .stat-value { font-size: 1.5rem; font-weight: 900; color: #fff; }
+
+        .report-box { background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 30px; margin-bottom: 25px; }
+        .report-header { font-size: 0.8rem; font-weight: 800; color: var(--text-dim); margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+        .report-body { font-size: 1rem; line-height: 1.7; color: #CBD5E1; }
+
+        .verdict-card {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), transparent);
+            border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 24px; padding: 25px;
+            display: flex; align-items: center; gap: 20px;
         }
-
-        .stat-label { font-size: 0.6rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; margin-bottom: 5px; display: block; }
-        .stat-value { font-size: 1.2rem; font-weight: 900; }
-
-        .report-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 25px;
-        }
-
-        .report-header { font-size: 0.8rem; font-weight: 800; color: var(--text-dim); margin-bottom: 15px; letter-spacing: 1px; }
-        .report-body { font-size: 0.95rem; line-height: 1.6; color: #E6EDF3; }
-
-        .verdict-box {
-            background: rgba(210, 153, 34, 0.1);
-            border: 1px solid rgba(210, 153, 34, 0.3);
-            border-radius: 15px;
-            padding: 20px;
-            margin-top: 20px;
-            text-align: center;
-        }
-
-        .verdict-title { color: var(--orange); font-size: 0.7rem; font-weight: 900; margin-bottom: 10px; letter-spacing: 1px; }
-        .verdict-text { font-size: 1.1rem; font-weight: 700; color: #fff; }
+        .verdict-icon { width: 48px; height: 48px; background: var(--primary); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .verdict-info h4 { font-size: 0.7rem; color: var(--accent); font-weight: 800; text-transform: uppercase; margin-bottom: 4px; }
+        .verdict-info p { font-size: 1.1rem; font-weight: 700; color: #fff; }
 
         /* Loader */
-        .loader-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(13, 17, 23, 0.9); backdrop-filter: blur(5px);
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            z-index: 1000;
-        }
-
-        .spinner {
-            width: 50px; height: 50px; border: 4px solid var(--border);
-            border-top-color: var(--blue); border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5,7,10,0.9); backdrop-filter: blur(10px); z-index: 10000; display: flex; align-items: center; justify-content: center; }
+        .spinner { width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.05); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .loader-text { margin-top: 20px; font-weight: 700; font-size: 0.8rem; color: var(--blue); letter-spacing: 2px; }
+        /* Switch */
+        .sw { position: relative; width: 40px; height: 20px; }
+        .sw input { opacity: 0; width: 0; height: 0; }
+        .sl { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #334155; transition: .4s; border-radius: 34px; }
+        .sl:before { position: absolute; content: ""; height: 16px; width: 16px; left: 2px; bottom: 2px; background: white; transition: .4s; border-radius: 50%; }
+        input:checked + .sl { background: var(--primary); }
+        input:checked + .sl:before { transform: translateX(20px); }
 
         .hidden { display: none !important; }
+
+        /* MEDIA QUERIES FOR RESPONSIVENESS */
+        @media (max-width: 1024px) {
+            .layout-grid { grid-template-columns: 1fr; }
+            .sidebar { width: 240px; }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .mobile-nav { display: flex; }
+            .workspace { padding-bottom: 80px; }
+            .top-nav { padding: 0 20px; height: 70px; }
+            .content { padding: 25px 20px; }
+            .header-box h2 { font-size: 1.6rem; }
+            .control-card { padding: 20px; border-radius: 20px; }
+            .stats-grid { grid-template-columns: 1fr; }
+            .verdict-card { flex-direction: column; text-align: center; gap: 15px; }
+            .top-nav .status-pill { display: none; }
+        }
     </style>
 </head>
 <body>
-    <div class="app-shell">
-        <header>
-            <h1>DIAMOND PROP AI</h1>
-            <span>PRO MLB ANALYTICS</span>
+    <aside class="sidebar">
+        <div class="logo"><i class="fas fa-diamond"></i><h1>DIAMOND PROP</h1></div>
+        <nav class="nav-list">
+            <button class="nav-btn active" data-view="batsman"><i class="fas fa-user-ninja"></i><span>Batter Analysis</span></button>
+            <button class="nav-btn" data-view="pitcher"><i class="fas fa-crosshairs"></i><span>Pitcher Insights</span></button>
+            <button class="nav-btn" data-view="ballpark"><i class="fas fa-stadium"></i><span>Venue Factors</span></button>
+        </nav>
+    </aside>
+
+    <nav class="mobile-nav">
+        <button class="m-nav-item active" data-view="batsman"><i class="fas fa-user-ninja"></i><span>Batter</span></button>
+        <button class="m-nav-item" data-view="pitcher"><i class="fas fa-crosshairs"></i><span>Pitcher</span></button>
+        <button class="m-nav-item" data-view="ballpark"><i class="fas fa-stadium"></i><span>Venue</span></button>
+    </nav>
+
+    <main class="workspace">
+        <header class="top-nav">
+            <div style="color: var(--text-dim); font-size: 0.8rem; font-weight: 700;"><i class="fas fa-calendar-day" style="margin-right: 8px;"></i>SEASON 2026</div>
+            <div class="status-pill"><div class="status-dot"></div>STATCAST LIVE</div>
         </header>
 
-        <nav>
-            <button class="nav-tab active" data-tab="batsman">
-                <i class="fas fa-user"></i>
-                <span>BATTER</span>
-            </button>
-            <button class="nav-tab" data-tab="pitcher">
-                <i class="fas fa-baseball"></i>
-                <span>PITCHER</span>
-            </button>
-            <button class="nav-tab" data-tab="ballpark">
-                <i class="fas fa-mountain-sun"></i>
-                <span>BALLPARK</span>
-            </button>
-        </nav>
-
-        <main>
-            <!-- Batsman Panel -->
-            <section id="batsman" class="panel active">
-                <div class="card">
-                    <div class="field">
-                        <label>Batter Name</label>
-                        <div class="input-container">
-                            <input type="text" id="batter-name" value="Matt Olson">
+        <div class="content">
+            <div id="view-batsman" class="view">
+                <div class="header-box"><h2>Batter Analytics</h2><p>Predictive modeling for Home Run probabilities.</p></div>
+                <div class="layout-grid">
+                    <div class="control-card">
+                        <div class="input-group"><label>Batter Name</label><div class="input-box"><i class="fas fa-search"></i><input type="text" id="batter-name" value="Matt Olson"></div></div>
+                        <div class="row">
+                            <div class="input-group"><label>Market Odds</label><div class="input-box"><input type="number" id="odds" value="250"></div></div>
+                            <div class="input-group"><label>Pitcher HR/9</label><div class="input-box"><input type="number" id="hr9" value="1.2" step="0.1"></div></div>
                         </div>
+                        <div class="input-group"><label>Park Factor</label><div class="input-box"><input type="number" id="park-factor" value="1.0" step="0.01"></div></div>
+                        <div class="toggle-row"><span>Is Home Venue?</span><label class="sw"><input type="checkbox" id="is-home" checked><span class="sl"></span></label></div>
+                        <button class="btn-run" id="analyze-batsman"><i class="fas fa-bolt"></i> RUN ANALYSIS</button>
                     </div>
-                    <div class="field">
-                        <label>Market Odds</label>
-                        <div class="input-container">
-                            <input type="number" id="odds" value="250">
-                        </div>
-                    </div>
-                    <div class="field">
-                        <label>Pitcher HR/9</label>
-                        <div class="input-container">
-                            <input type="number" id="hr9" value="1.2" step="0.1">
-                        </div>
-                    </div>
-                    <div class="field">
-                        <label>Park Factor</label>
-                        <div class="input-container">
-                            <input type="number" id="park-factor" value="1.0" step="0.01">
-                        </div>
-                    </div>
-                    <div class="switch-row">
-                        <span>Is Home Venue?</span>
-                        <label class="toggle">
-                            <input type="checkbox" id="is-home" checked>
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                    <button class="predict-btn" id="analyze-batsman" style="background-color: var(--blue)">PREDICT HOME RUN</button>
+                    <div id="batsman-results" class="results-view"><div class="empty-state"><i class="fas fa-chart-line"></i><p>Awaiting data entry...</p></div></div>
                 </div>
-                <div id="batsman-results" class="results-container hidden"></div>
-            </section>
+            </div>
 
-            <!-- Pitcher Panel -->
-            <section id="pitcher" class="panel">
-                <div class="card">
-                    <div class="field">
-                        <label>Pitcher Name</label>
-                        <div class="input-container">
-                            <input type="text" id="pitcher-name" value="Jameson Taillon">
-                        </div>
+            <div id="view-pitcher" class="view hidden">
+                <div class="header-box"><h2>Pitcher Insights</h2><p>Vulnerability and performance analytics.</p></div>
+                <div class="layout-grid">
+                    <div class="control-card">
+                        <div class="input-group"><label>Pitcher Name</label><div class="input-box"><i class="fas fa-shield"></i><input type="text" id="pitcher-name" value="Jameson Taillon"></div></div>
+                        <button class="btn-run" id="analyze-pitcher" style="background: linear-gradient(135deg, #F43F5E, #E11D48)">EVALUATE PITCHER</button>
                     </div>
-                    <button class="predict-btn" id="analyze-pitcher" style="background-color: var(--red)">ANALYZE VULNERABILITY</button>
+                    <div id="pitcher-results" class="results-view"><div class="empty-state"><i class="fas fa-crosshairs"></i><p>Awaiting pitcher...</p></div></div>
                 </div>
-                <div id="pitcher-results" class="results-container hidden"></div>
-            </section>
+            </div>
 
-            <!-- Ballpark Panel -->
-            <section id="ballpark" class="panel">
-                <div class="card">
-                    <div class="field">
-                        <label>Stadium Name</label>
-                        <div class="input-container">
-                            <input type="text" id="stadium-name" value="Coors Field">
-                        </div>
+            <div id="view-ballpark" class="view hidden">
+                <div class="header-box"><h2>Venue Factors</h2><p>Atmospheric and dimensional analysis.</p></div>
+                <div class="layout-grid">
+                    <div class="control-card">
+                        <div class="input-group"><label>Stadium Name</label><div class="input-box"><i class="fas fa-location-dot"></i><input type="text" id="stadium-name" value="Coors Field"></div></div>
+                        <button class="btn-run" id="analyze-ballpark" style="background: linear-gradient(135deg, #F59E0B, #D97706)">ANALYZE STADIUM</button>
                     </div>
-                    <button class="predict-btn" id="analyze-ballpark" style="background-color: var(--orange)">FETCH BALLPARK DATA</button>
+                    <div id="ballpark-results" class="results-view"><div class="empty-state"><i class="fas fa-stadium"></i><p>Awaiting stadium...</p></div></div>
                 </div>
-                <div id="ballpark-results" class="results-container hidden"></div>
-            </section>
-        </main>
-    </div>
+            </div>
+        </div>
+    </main>
 
-    <!-- Loader -->
-    <div id="loader" class="loader-overlay hidden">
-        <div class="spinner"></div>
-        <p class="loader-text">AI ANALYZING...</p>
-    </div>
+    <div id="loader" class="overlay hidden"><div class="spinner"></div></div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const tabs = document.querySelectorAll('.nav-tab');
-            const panels = document.querySelectorAll('.panel');
+            const navItems = [...document.querySelectorAll('.nav-btn'), ...document.querySelectorAll('.m-nav-item')];
+            const views = document.querySelectorAll('.view');
             const loader = document.getElementById('loader');
 
-            tabs.forEach(tab => {
-                tab.addEventListener('click', () => {
-                    tabs.forEach(t => t.classList.remove('active'));
-                    panels.forEach(p => p.classList.remove('active'));
-                    tab.classList.add('active');
-                    document.getElementById(tab.dataset.tab).classList.add('active');
+            navItems.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    navItems.forEach(b => b.classList.remove('active'));
+                    views.forEach(v => v.classList.add('hidden'));
+                    const target = btn.dataset.view;
+                    navItems.filter(b => b.dataset.view === target).forEach(b => b.classList.add('active'));
+                    document.getElementById(`view-${target}`).classList.remove('hidden');
                 });
             });
 
-            async function fetchData(url, payload) {
+            async function api(url, body) {
                 loader.classList.remove('hidden');
                 try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    const data = await response.json();
-                    if (data.error) {
-                        alert("Error: " + data.error);
-                        return null;
-                    }
-                    return data;
-                } catch (e) {
-                    alert("Analysis Failed: Check Connection");
-                } finally {
-                    loader.classList.add('hidden');
-                }
+                    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                    const d = await r.json();
+                    if (d.error) { alert(d.error); return null; }
+                    return d;
+                } catch (e) { alert("Network Error"); } finally { loader.classList.add('hidden'); }
             }
 
-            function renderResults(containerId, data, accentColor) {
-                const container = document.getElementById(containerId);
-                container.classList.remove('hidden');
-                
-                let statsHtml = '<div class="stat-grid">';
+            function render(id, data, color) {
+                const c = document.getElementById(id);
+                let stats = '<div class="stats-grid">';
                 if (data.metrics) {
-                    for (const [key, val] of Object.entries(data.metrics)) {
-                        statsHtml += `
-                            <div class="stat-card" style="border-bottom: 3px solid ${accentColor}">
-                                <span class="stat-label">${key.replace(/_/g, ' ')}</span>
-                                <span class="stat-value" style="color: ${accentColor}">${val}</span>
-                            </div>`;
+                    for (const [k, v] of Object.entries(data.metrics)) {
+                        stats += `<div class="stat-item" style="border-bottom-color: ${color}"><span class="stat-label">${k.replace(/_/g, ' ')}</span><span class="stat-value">${v}</span></div>`;
                     }
                 }
-                statsHtml += '</div>';
-
-                const summary = data.summary || "";
-                let body = summary;
-                let verdictHtml = "";
-                const separator = "### OVERALL MATCH PREDICTION ###";
-                
-                if (summary.includes(separator)) {
-                    const parts = summary.split(separator);
-                    body = parts[0].trim();
-                    verdictHtml = `
-                        <div class="verdict-box">
-                            <div class="verdict-title">AI PROBABILITY VERDICT</div>
-                            <div class="verdict-text">${parts[1].trim()}</div>
-                        </div>`;
+                stats += '</div>';
+                const s = data.summary || "";
+                let b = s, v = "";
+                const sep = "### OVERALL MATCH PREDICTION ###";
+                if (s.includes(sep)) {
+                    const p = s.split(sep);
+                    b = p[0].trim();
+                    v = `<div class="verdict-card"><div class="verdict-icon"><i class="fas fa-check"></i></div><div class="verdict-info"><h4>Final Verdict</h4><p>${p[1].trim()}</p></div></div>`;
                 }
-
-                container.innerHTML = `
-                    ${statsHtml}
-                    <div class="report-card">
-                        <div class="report-header">INTELLIGENCE REPORT</div>
-                        <div class="report-body">${body.replace(/\n/g, '<br>')}</div>
-                    </div>
-                    ${verdictHtml}
-                `;
-                container.scrollIntoView({ behavior: 'smooth' });
+                c.innerHTML = `<div class="res-card">${stats}<div class="report-box"><div class="report-header"><i class="fas fa-brain"></i> AI REPORT</div><div class="report-body">${b.replace(/\n/g, '<br>')}</div></div>${v}</div>`;
+                window.scrollTo({ top: c.offsetTop - 100, behavior: 'smooth' });
             }
 
             document.getElementById('analyze-batsman').addEventListener('click', async () => {
-                const results = await fetchData('/predict_batter', {
+                const r = await api('/predict_batter', {
                     player_name: document.getElementById('batter-name').value,
                     sportsbook_odds: parseFloat(document.getElementById('odds').value),
                     pitcher_hr9: parseFloat(document.getElementById('hr9').value),
                     park_factor: parseFloat(document.getElementById('park-factor').value),
                     is_home: document.getElementById('is-home').checked
                 });
-                if (results) renderResults('batsman-results', results, '#58A6FF');
+                if (r) render('batsman-results', r, '#6366F1');
             });
 
             document.getElementById('analyze-pitcher').addEventListener('click', async () => {
-                const results = await fetchData('/predict_pitcher', { 
-                    pitcher_name: document.getElementById('pitcher-name').value 
-                });
-                if (results) renderResults('pitcher-results', results, '#F85149');
+                const r = await api('/predict_pitcher', { pitcher_name: document.getElementById('pitcher-name').value });
+                if (r) render('pitcher-results', r, '#F43F5E');
             });
 
             document.getElementById('analyze-ballpark').addEventListener('click', async () => {
-                const results = await fetchData('/park_history', {
-                    stadium_name: document.getElementById('stadium-name').value
-                });
-                if (results) renderResults('ballpark-results', results, '#D29922');
+                const r = await api('/park_history', { stadium_name: document.getElementById('stadium-name').value });
+                if (r) render('ballpark-results', r, '#F59E0B');
             });
         });
     </script>
