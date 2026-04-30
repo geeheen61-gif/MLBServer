@@ -1,0 +1,8 @@
+flask
+flask-cors
+pybaseball
+pandas
+numpy
+groq
+python-dotenv
+waitress

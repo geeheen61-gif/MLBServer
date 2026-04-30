@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: diamond-prop-ai-server
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python wsgi.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.12
+      - key: GROQ_API_KEY
+        sync: false # Set this manually in the Render Dashboard
