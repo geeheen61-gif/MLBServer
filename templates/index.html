@@ -357,7 +357,12 @@
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-                    return await response.json();
+                    const data = await response.json();
+                    if (data.error) {
+                        alert("Error: " + data.error);
+                        return null;
+                    }
+                    return data;
                 } catch (e) {
                     alert("Analysis Failed: Check Connection");
                 } finally {
@@ -410,7 +415,7 @@
             document.getElementById('analyze-batsman').addEventListener('click', async () => {
                 const results = await fetchData('/predict_batter', {
                     player_name: document.getElementById('batter-name').value,
-                    odds: parseFloat(document.getElementById('odds').value),
+                    sportsbook_odds: parseFloat(document.getElementById('odds').value),
                     pitcher_hr9: parseFloat(document.getElementById('hr9').value),
                     park_factor: parseFloat(document.getElementById('park-factor').value),
                     is_home: document.getElementById('is-home').checked
@@ -419,15 +424,15 @@
             });
 
             document.getElementById('analyze-pitcher').addEventListener('click', async () => {
-                const results = await fetchData('/predict_pitcher', { pitcher_name: document.getElementById('pitcher-name').value });
+                const results = await fetchData('/predict_pitcher', { 
+                    pitcher_name: document.getElementById('pitcher-name').value 
+                });
                 if (results) renderResults('pitcher-results', results, '#F85149');
             });
 
             document.getElementById('analyze-ballpark').addEventListener('click', async () => {
                 const results = await fetchData('/park_history', {
-                    stadium_name: document.getElementById('stadium-name').value,
-                    player_name: document.getElementById('batter-name').value,
-                    pitcher_name: document.getElementById('pitcher-name').value
+                    stadium_name: document.getElementById('stadium-name').value
                 });
                 if (results) renderResults('ballpark-results', results, '#D29922');
             });
