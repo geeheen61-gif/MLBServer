@@ -120,7 +120,7 @@ REQUIRED ANALYSIS STRUCTURE:
 Rules:
 - Be extremely analytical. Use terms like "exit velocity," "launch angle," or "pitch mix" if relevant.
 - Clearly state the SITUATION in which the batter excels.
-- End with a clear "OVERALL MATCH PREDICTION" section.
+- End with a final section titled: ### OVERALL MATCH PREDICTION ###
 """
             client_summary = self._groq_summary(prompt)
 
@@ -267,7 +267,7 @@ REQUIRED STRUCTURE:
 3. COMPLETE MATCH ANALYSIS: How does this pitcher's profile impact the overall match scoring and home run potential for the opposing team today?
 4. OVERALL MATCH PREDICTION: Final verdict on this pitcher's likely performance floor/ceiling for today.
 
-End with "OVERALL MATCH PREDICTION".
+End with a final section titled: ### OVERALL MATCH PREDICTION ###
 """
             pitcher_summary = self._groq_summary(prompt)
 
@@ -316,7 +316,7 @@ REQUIRED STRUCTURE:
 3. COMPLETE MATCH ANALYSIS: How does this ballpark's profile change the overall strategy of the match between these specific teams/players?
 4. OVERALL MATCH PREDICTION: Final verdict on the "Over/Under" environment for today's match in this stadium.
 
-End with "OVERALL MATCH PREDICTION".
+End with a final section titled: ### OVERALL MATCH PREDICTION ###
 """
         stadium_summary = self._groq_summary(prompt)
         info["summary"] = stadium_summary

@@ -6,3 +6,4 @@ venv/
 .git/
 .vercel/
 .render/
+groq.txt
