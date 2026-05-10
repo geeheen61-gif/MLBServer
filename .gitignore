@@ -1,9 +1,23 @@
+# Byte-compiled / optimized / DLL files
 __pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
 .env
-.venv/
+.venv
+env/
 venv/
-*.pyc
-.git/
-.vercel/
-.render/
-groq.txt
+ENV/
+env.bak/
+venv.bak/
+
+# Project specific
+cache/
+*.json
+!requirements.txt
+!package.json
+
+# IDEs
+.vscode/
+.idea/
