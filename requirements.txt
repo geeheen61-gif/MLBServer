@@ -6,3 +6,4 @@ numpy
 groq
 python-dotenv
 waitress
+requests

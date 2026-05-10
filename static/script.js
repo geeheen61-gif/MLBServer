@@ -109,12 +109,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('analyze-batsman').addEventListener('click', async () => {
         const payload = {
             player_name: document.getElementById('batter-name').value,
-            odds: parseFloat(document.getElementById('odds').value),
+            sportsbook_odds: parseFloat(document.getElementById('odds').value),
             pitcher_hr9: parseFloat(document.getElementById('hr9').value),
             park_factor: parseFloat(document.getElementById('park-factor').value),
             is_home: document.getElementById('is-home').checked
         };
         const results = await callEngine('/predict_batter', payload);
+        if (results && results.player_info) {
+             document.getElementById('stadium-name').value = results.player_info.current_stadium;
+             document.getElementById('park-factor').value = results.player_info.park_factor;
+        }
         if (results) injectAnalytics('batsman-results', results, '#6366F1');
     });
 
@@ -128,11 +132,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('analyze-ballpark').addEventListener('click', async () => {
         const payload = {
-            stadium_name: document.getElementById('stadium-name').value,
-            player_name: document.getElementById('batter-name').value,
-            pitcher_name: document.getElementById('pitcher-name').value
+            stadium_name: document.getElementById('stadium-name').value
         };
         const results = await callEngine('/park_history', payload);
+        if (results && results.metrics && results.metrics.hr_factor) {
+            document.getElementById('park-factor').value = results.metrics.hr_factor;
+        }
         if (results) injectAnalytics('ballpark-results', results, '#F59E0B');
     });
 });

@@ -46,7 +46,7 @@ def predict_batter():
             float(pitcher_hr9), 
             float(park_factor), 
             pitcher_name=data.get('pitcher_name', 'Unknown Pitcher'),
-            stadium_name=data.get('stadium_name', 'Unknown Stadium'),
+            manual_team=data.get('manual_team'),
             is_home=is_home
         )
         return jsonify(result)
@@ -108,7 +108,7 @@ def analyze_game():
             player_name, 
             float(sportsbook_odds), 
             float(pitcher_hr9), 
-            park_info['hr_factor'], 
+            park_info['metrics']['hr_factor'], 
             is_home=is_home
         )
 
@@ -117,6 +117,20 @@ def analyze_game():
             "pitcher_analysis": pitcher_result,
             "stadium_analysis": park_info
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/update_player_team', methods=['POST'])
+def update_player_team():
+    data = request.get_json()
+    player_id = data.get('player_id')
+    team_name = data.get('team_name')
+    if not player_id or not team_name:
+        return jsonify({"error": "Missing player_id or team_name"}), 400
+    
+    try:
+        result = predictor.update_player_team(player_id, team_name)
+        return jsonify({"success": True, "updated_info": result})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
